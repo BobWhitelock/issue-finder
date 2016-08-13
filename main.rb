@@ -3,6 +3,10 @@ require 'octokit'
 require 'parallel'
 require 'ruby-progressbar'
 require 'colorize'
+require 'terminal-table'
+require 'highline'
+require 'word_wrap'
+require 'word_wrap/core_ext'
 
 github_user = ENV['GITHUB_USER']
 github_password = ENV['GITHUB_PASSWORD']
@@ -17,8 +21,10 @@ puts 'Getting stars...'
 stars = Octokit.starred(github_user)
 puts
 
+puts 'Getting issues for stars...'
+
 progress_bar = ProgressBar.create(
-  title: 'Getting repo issues',
+  title: 'Stars retrieved',
   total: stars.length
 )
 progress_bar_mutex = Mutex.new
@@ -63,13 +69,21 @@ puts
 puts 'Found issues:'
 puts
 
+terminal_width = HighLine::SystemExtensions.terminal_size[0]
+Terminal::Table::Style.defaults = {width: terminal_width}
+
 repo_issues.map do |issue_results|
   lang = issue_results[:language]
   color = lang_color[lang] || :default
-  puts "#{issue_results[:repo]} -- #{lang}".colorize(color)
-  puts '==============='.colorize(color)
-  issue_results[:issues].map do |issue|
-    puts "#{issue.title} -- #{issue.html_url}".colorize(color)
+
+  title = "#{issue_results[:repo]} -- #{lang.to_s.colorize(color)}"
+  issues_table = Terminal::Table.new(title: title) do |table|
+    issue_results[:issues].map do |issue|
+      table << [issue.created_at, issue.title.fit(30), issue.html_url]
+      table.add_separator
+    end
   end
+
+  puts issues_table
   puts
 end
